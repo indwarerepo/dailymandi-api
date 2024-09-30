@@ -1,0 +1,18 @@
+{
+  "node_env": "",
+  "app_name": "",
+  "jwt_auth_key": "",
+  "jwt_expiration_days": "",
+  "azure_storage_url": "",
+  "azure_storage_access_key": "",
+  "azure_storage_secret_access_key": "",
+  "email_user": "",
+  "email_client_id": "",
+  "email_client_secret": "",
+  "email_refresh_token": "",
+  "email_access_token": "",
+  "db_host": "",
+  "db_user": "",
+  "db_password": "",
+  "db_name": ""
+}

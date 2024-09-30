@@ -1,0 +1,27 @@
+CREATE TABLE users
+(
+    id uuid NOT NULL DEFAULT uuid_generate_v4(),
+    name character varying(50),
+    email character varying(50),
+    password character varying(255),
+    "isUseGoogleAuth" boolean,
+    "googleId" character varying(100),
+    phone character varying(50),
+    otp integer varying(6),
+    "isAdmin" boolean NOT NULL DEFAULT false,
+    image character varying,
+    emailVerified character varying,
+    "verificationTimeout" timestamp without time zone,
+    "walletValue" integer DEFAULT 0,
+    referredFreq integer,
+    referredBy character varying,
+    referralCode character varying,
+    "ipAddress" character varying,
+    "twoFAOption" "userTypeOption",
+    "otpTimeOut" time without time zone[],
+    "isActive" boolean NOT NULL DEFAULT true,
+    "softDelete" boolean NOT NULL DEFAULT false,
+    "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" timestamp without time zone,
+    PRIMARY KEY (id)
+);
