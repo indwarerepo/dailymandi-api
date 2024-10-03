@@ -7,7 +7,7 @@ CREATE TABLE users
     "isUseGoogleAuth" boolean,
     "googleId" character varying(100),
     phone character varying(50),
-    otp integer varying(6),
+    otp character varying(6),
     "isAdmin" boolean NOT NULL DEFAULT false,
     image character varying,
     emailVerified character varying,

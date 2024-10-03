@@ -8,16 +8,15 @@ CREATE TABLE driver_order_status
     "softDelete" boolean DEFAULT false,
     "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" timestamp without time zone,
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
         FOREIGN KEY ("driverId")
-        REFERENCES public.driver (id) MATCH SIMPLE
+        REFERENCES driver (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE NO ACTION
         NOT VALID,
     FOREIGN KEY ("orderId")
-        REFERENCES public.orders (id) MATCH SIMPLE
+        REFERENCES orders (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE NO ACTION
         NOT VALID
-);
 );

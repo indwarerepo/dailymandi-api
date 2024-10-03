@@ -24,8 +24,8 @@ CREATE TABLE user_address
         ON DELETE NO ACTION
         NOT VALID,
     CONSTRAINT "userPincodeFkey" FOREIGN KEY (pincode)
-    REFERENCES public.pincode (id) MATCH SIMPLE
+    REFERENCES pincode (id) MATCH SIMPLE
     ON UPDATE CASCADE
     ON DELETE CASCADE
-    NOT VALID;    
+    NOT VALID  
 );

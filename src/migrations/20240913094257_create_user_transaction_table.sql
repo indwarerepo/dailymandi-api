@@ -2,7 +2,7 @@ CREATE TABLE user_transaction
 (
     id uuid NOT NULL DEFAULT uuid_generate_v4(),
     "userId" uuid NOT NULL,
-    "orderId" uuid
+    "orderId" uuid,
     "transactionType" boolean DEFAULT false,
     amount double precision,
     remarks character varying,
@@ -14,10 +14,10 @@ CREATE TABLE user_transaction
         REFERENCES users (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE NO ACTION
-        NOT VALID
-        ADD CONSTRAINT "UserTransactionOrder" FOREIGN KEY ("orderId")
+        NOT VALID,
+    CONSTRAINT "UserTransactionOrder" FOREIGN KEY ("orderId")
     REFERENCES orders (id) MATCH SIMPLE
     ON UPDATE NO ACTION
     ON DELETE NO ACTION
-    NOT VALID;
+    NOT VALID
 );

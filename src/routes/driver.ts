@@ -27,6 +27,10 @@ import {
   ProductInventoryModel,
   ProductInventoryHistoryModel,
   UserTransactionModel,
+  OrderReturnModel,
+  ReturnDetailModel,
+  UserWalletModel,
+  UserModel,
 } from '../model/models';
 import { RegisterBody, UpdateBody, LoginBody, DriverLoginBody, Driver } from '../types/driver';
 import Order from '../model/lib/order';
@@ -747,107 +751,135 @@ router.delete(
   }),
 );
 
-router.put(
-  '/accept-order/:id',
-  [auth],
-  asyncHandler(async (req: Request, res: Response) => {
-    // return console.log(req.body.prodArr.orderType);
+router.put('/return-order/:id', [auth], async (req: ICustomRequest, res: Response) => {
+  // return console.log(req.body.prodArr.orderType);
+  try {
     var orderTypeSum = 0;
-    const order = await OrderModel().select('productId').where({ id: req.params.id }).findOne();
+    let order = await OrderModel()
+      .select('id,orderNumber,customerId,orderStatusId,driverId,orderPrice,deliveryOtp')
+      .where({ id: req.params.id })
+      .findOne();
     if (!order) return res.status(404).send({ message: 'order not found' });
+    let orderUpdate = await OrderModel()
+      .select('customerId,orderStatusId,driverId,orderPrice,deliveryOtp')
+      .where({ id: req.params.id })
+      .updateOne({ orderStatusId: '30994c9d-ec00-4d55-b78c-c03361056c24' });
     //console.log(orderDetail);
+    let orderReturn;
+    if (req.body.prodArr.length > 0) {
+      orderReturn = await OrderReturnModel().select('id').where({ id: req.params.id }).createOne({
+        orderId: order.id,
+        customerId: order.customerId,
+        orderStatusId: order.orderStatusId,
+        driverId: order.driverId,
+        refundStatus: true,
+        acceptedOn: new Date(),
+        isReturn: true,
+      });
+    }
     for (var i = 0; i < req.body.prodArr.length; i++) {
       // console.log(req.body.prodArr[i].orderType);
-      orderTypeSum += req.body.prodArr[i].orderType;
-      if (req.body.prodArr[i].orderType) {
-        //const order = await Order.findById(req.params.id)
-        let productVariant = await ProductVariantModel()
-          .select('id,stock')
-          .where({ id: req.body.prodArr[i].prodId })
-          .findOne();
-        let preUpdateStock = productVariant.stock;
-        let postUpdateStock = productVariant.stock - req.body.prodArr[i].orderQnt;
+      //orderTypeSum += req.body.prodArr[i].orderType;
+      //const order = await Order.findById(req.params.id)
+      let orderDetails = await OrderDetailModel()
+        .select(
+          'id,productId,quantity,orderPrice,originalPrice,taxAmt,totalAmt,isReturned,isSupplied,returnedStatus',
+        )
+        .where({ orderId: order.id, productId: req.body.prodArr[i].prodId })
+        .findOne();
+      let productVariant = await ProductVariantModel()
+        .select('id,stock,productId')
+        .where({ id: req.body.prodArr[i].prodId })
+        .findOne();
+      let preUpdateStock = productVariant.stock;
+      let postUpdateStock = productVariant.stock - orderDetails.quantity;
 
-        let productVariantUpdate = await ProductVariantModel()
-          .select('stock')
-          .where({ id: productVariant.id })
-          .updateOne({
-            stock: postUpdateStock,
-          });
-
-        if (productVariantUpdate) {
-          const UpdateInventory = await ProductInventoryModel()
-            .select('batchNo')
-            .where({
-              inventoryStage: 'Running',
-              productId: req.body.prodArr[i].prodId,
-            })
-            .updateOne({
-              totalStock: postUpdateStock,
-            });
-
-          const updateHistory = await ProductInventoryHistoryModel()
-            .where({
-              batchId: UpdateInventory.batchNo,
-              productVariantId: req.body.prodArr[i].prodId,
-            })
-            .updateOne({
-              previousStock: productVariant.stock,
-              currentStock: postUpdateStock,
-              changeStock: req.body.prodArr[i].orderQnt,
-              remarks: 'Update Stock',
-            });
-        }
-        const orderDetail = await OrderDetailModel()
+      if (orderDetails) {
+        const addReturnDetails = await ReturnDetailModel().createOne({
+          returnId: orderReturn.id,
+          productId: orderDetails.productId,
+          // productVariantId: productVariant.productId,
+          quantity: orderDetails.quantity,
+          orderPrice: orderDetails.orderPrice,
+          subTotal: orderDetails.originalPrice,
+          totalAmt: orderDetails.totalAmt,
+          returnedRemarks: 'Order Return Accepted',
+          createdBy: (req as any).user.id,
+        });
+        const userWallet = await UserWalletModel()
+          .select('id,walletAmount')
           .where({
-            orderId: req.params.id,
-            productId: req.body.prodArr[i].prodId,
+            userId: order.customerId,
           })
-          .updateOne({
-            order_status: '1',
-          });
-      } else {
-        const orderDetail = await OrderDetailModel()
-          .where({
-            orderId: req.params.id,
-            productId: req.body.prodArr[i].prodId,
-          })
-          .updateOne({
-            order_status: '2',
-          });
-
-        let productVariant = await ProductVariantModel()
-          .select('id,stock')
-          .where(req.body.prodArr[i].prodId)
           .findOne();
-        let stockUpdate = productVariant.stock + req.body.prodArr[i].orderQnt;
 
-        let productVariantUpdate = await ProductVariantModel()
-          .select('stock')
-          .where({ id: productVariant.id })
+        const addUserWallet = await UserWalletModel()
+          .where({ id: userWallet.id })
           .updateOne({
-            stock: stockUpdate,
+            userId: order.customerId,
+            walletAmount: userWallet.walletAmount + orderDetails.orderPrice,
+            createdBy: (req as any).user.id,
           });
-      }
-    }
-    if (orderTypeSum > 0) {
-      const order = await OrderModel()
-        .select('productId')
-        .where({ id: req.params.id })
-        .updateOne({
-          deliveryAmt: req.body.deliveryAmt,
-          orderTotal: req.body.orderTotal,
-          orderTotalInWord: orderTotalInToWords(req.body.orderTotal),
+        const getUser = await UserModel()
+          .select('id,walletValue')
+          .where({ id: order.customerId })
+          .findOne();
+        let totalWallet = getUser.walletValue + orderDetails.orderPrice;
+        const updateUser = await UserModel().select('id').where({ id: getUser.id }).updateOne({
+          walletValue: totalWallet,
+        });
+        const addUserTransaction = await UserTransactionModel().createOne({
+          userId: order.customerId,
+          transactionType: true,
+          amount: orderDetails.orderPrice,
+          remarks: 'Refund Against Order # ' + order.orderNumber,
+          // createdBy: (req as any).user.id,
         });
 
-      res.send({ otp: order.deliveryOtp, message: 'OTP is:' + order.deliveryOtp });
-    } else {
-      return res.status(404).send({ message: 'Please select any one product.' });
+        const updateHistory = await ProductInventoryHistoryModel().createOne({
+          productId: productVariant.productId,
+          productVariantId: productVariant.id,
+          // batchId: UpdateInventory.batchNo,
+          previousStock: productVariant.stock,
+          currentStock: postUpdateStock,
+          changeStock: orderDetails.quantity,
+          remarks: 'Order Canceled',
+          createdBy: (req as any).user.id,
+        });
+      }
+      const orderDetail = await OrderDetailModel()
+        .where({
+          orderId: req.params.id,
+          productId: req.body.prodArr[i].prodId,
+        })
+        .updateOne({
+          order_status: 1,
+        });
     }
+    // console.log(orderTotalInToWords(req.body.totalAmt));
+    // if (orderTypeSum > 0) {
+    // await OrderModel()
+    //   .select('id')
+    //   .where({ id: req.params.id })
+    //   .updateOne({
+    //     deliveryAmt: req.body.deliveryAmt,
+    //     orderTotal: req.body.totalAmt,
+    //     orderTotalInWord: orderTotalInToWords(req.body.totalAmt),
+    //   });
+
+    res.send({ otp: order.deliveryOtp, message: 'OTP is:' + order.deliveryOtp });
+    // } else {
+    //   return res.status(404).send({ message: 'Please select any one product.' });
+    // }
     // return console.log(orderTypeSum);
     //return;
-  }),
-);
+  } catch (error: any) {
+    console.log('🛑 Error =>', error);
+    res
+      .status(HttpStatusCode.InternalServerError)
+      .send({ statusCode: HttpStatusCode.InternalServerError, message: error });
+  }
+});
 
 router.put(
   '/delivery/:id',

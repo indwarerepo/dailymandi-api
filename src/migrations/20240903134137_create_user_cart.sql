@@ -1,10 +1,10 @@
 CREATE TABLE user_cart
 (
-    id uuid NOT NULL uuid_generate_v4(),
+    id uuid NOT NULL DEFAULT uuid_generate_v4(),
     "userId" uuid,
     "productId" uuid,
     "cartProdQnt" integer,
-    "itemType" "cartType" NOT NULL DEFAULT C,
+    "itemType" "cartType" NOT NULL,
     "isActive" boolean NOT NULL DEFAULT true,
     "softDelete" boolean NOT NULL DEFAULT false,
     "createdBy" uuid,
@@ -21,5 +21,5 @@ CREATE TABLE user_cart
     REFERENCES public.users (id) MATCH SIMPLE
     ON UPDATE CASCADE
     ON DELETE CASCADE
-    NOT VALID;
+    NOT VALID
 );

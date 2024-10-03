@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS return_detail
      CONSTRAINT "returnProductWithVariant" FOREIGN KEY ("productId")
         REFERENCES product_variant (id) MATCH SIMPLE
         ON UPDATE NO ACTION
-        ON DELETE NO ACTION
+        ON DELETE NO ACTION,
     CONSTRAINT "reurnDetail" FOREIGN KEY ("returnId")
         REFERENCES order_return (id) MATCH SIMPLE
         ON UPDATE NO ACTION

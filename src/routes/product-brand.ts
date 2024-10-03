@@ -191,6 +191,32 @@ router.get(
 );
 
 /**
+ * Get all brand dropdown for web
+ */
+router.get(
+  '/web/drop-down/',
+  asyncHandler(async (req: Request, res: Response) => {
+    const records = await ProductBrandModel()
+      .select('id, name')
+      .where({
+        //createdBy: (req as any).user.id,
+        softDelete: false,
+      })
+      .find();
+    if (!records) throw new CustomError('No records found.', HttpStatusCode.NotFound);
+    const count = await ProductBrandModel()
+      .where({ softDelete: false, isActive: true })
+      .countDocuments();
+    res.status(HttpStatusCode.Ok).send({
+      statusCode: HttpStatusCode.Ok,
+      message: 'Successfully found records.',
+      data: records,
+      count: count,
+    });
+  }),
+);
+
+/**
  * Get records by id of category
  */
 router.get(

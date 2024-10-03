@@ -38,6 +38,8 @@ export default function (app: Express) {
     'http://localhost:8082/',
     'http://148.113.12.204:8085',
     'http://148.113.12.204:8080',
+    'https://aonemart.in',
+    'https://admin.aonemart.in',
   ];
   app.use(function (req: Request, res: Response, next: NextFunction) {
     const requestOrigin = req.headers.origin || '';

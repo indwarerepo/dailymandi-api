@@ -15,7 +15,7 @@ CREATE TABLE order_detail
     "returnedStatus" boolean DEFAULT false,
     "returnedRemarks" character varying,
     "returnedDateLimit" timestamp without time zone,
-    order_status order_status_type NOT NULL DEFAULT '0';
+    order_status order_status_type NOT NULL DEFAULT '0',
     "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     "createdBy" uuid NOT NULL,
     "updatedAt" timestamp without time zone,
@@ -29,18 +29,18 @@ CREATE TABLE order_detail
         ON DELETE NO ACTION
         NOT VALID,
     CONSTRAINT "orderTax_fkey()" FOREIGN KEY ("productTaxId")
-        REFERENCES public.tax_master (id) MATCH SIMPLE
+        REFERENCES tax_master (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE NO ACTION
-        NOT VALID,
+        NOT VALID,
     CONSTRAINT "orderWithProduct_fkey()" FOREIGN KEY ("productDetailsId")
-        REFERENCES public.product (id) MATCH SIMPLE
+        REFERENCES product (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE NO ACTION
         NOT VALID,
     CONSTRAINT "orderDetailwithProduct_fkey()" FOREIGN KEY ("productId")
-        REFERENCES public.product_variant (id) MATCH SIMPLE
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
-        NOT VALID;
+        REFERENCES product_variant (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION
+        NOT VALID
 );

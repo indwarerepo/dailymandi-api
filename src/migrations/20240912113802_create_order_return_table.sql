@@ -37,8 +37,8 @@ CREATE TABLE IF NOT EXISTS order_return
         REFERENCES order_status (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE NO ACTION,
-    CONSTRAINT orderreturn FOREIGN KEY ("orderId")
-        REFERENCES "order" (id) MATCH SIMPLE
+    CONSTRAINT "orderreturn" FOREIGN KEY ("orderId")
+        REFERENCES "orders" (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE NO ACTION
 );

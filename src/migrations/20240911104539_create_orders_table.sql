@@ -38,7 +38,7 @@ CREATE TABLE orders
     "deliveryOtp" integer,
     "acceptedAt" timestamp without time zone,
     "deliveredAt" timestamp without time zone,
-    "varient_name" character varying(500),
+    "varient_name" character varying(500),
     "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     "createdBy" uuid,
     "updatedAt" timestamp without time zone,
@@ -65,5 +65,5 @@ CREATE TABLE orders
     REFERENCES delivery_slots (id) MATCH SIMPLE
     ON UPDATE NO ACTION
     ON DELETE NO ACTION
-    NOT VALID;
+    NOT VALID
 );

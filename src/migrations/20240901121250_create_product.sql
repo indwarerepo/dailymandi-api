@@ -10,8 +10,8 @@ CREATE TABLE product
     "productAttributes" character varying,
     "productMethod" boolean NOT NULL DEFAULT true,
     "productImage" character varying,
-    "paymentTerm" character varying;
-    "warrantyPolicy" character varying;
+    "paymentTerm" character varying,
+    "warrantyPolicy" character varying,
     "metaTitle" character varying,
     "metaDescription" text,
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP,
@@ -25,7 +25,7 @@ CREATE TABLE product
     REFERENCES product_category (id) MATCH SIMPLE
     ON UPDATE NO ACTION
     ON DELETE NO ACTION
-    NOT VALID
+    NOT VALID,
     CONSTRAINT "productBrandFkey" FOREIGN KEY ("brandId")
     REFERENCES product_brand (id) MATCH SIMPLE
     ON UPDATE NO ACTION

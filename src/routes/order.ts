@@ -232,20 +232,20 @@ router.post(
     let newOrder = await OrderModel()
       .select('id, orderNumber, orderTotal, paymentMethod, createdAt')
       .createOne(obj);
-
-    let updatedWalletAmount = customerWalletBalance.walletAmount - amountDeductionFromWallet;
-    await UserWalletModel().where({ userId: req.params.id }).updateOne({
-      walletAmount: updatedWalletAmount,
-    });
-    if (amountDeductionFromWallet > 0) {
-      await UserTransactionModel().createOne({
-        userId: (req as any).user.id,
-        transactionType: false,
-        amount: amountDeductionFromWallet,
-        remarks: `${amountDeductionFromWallet}/- deducted from your wallet for order ${newOrder.orderNumber} - invoice`,
+    if (body.isWalletUsed) {
+      let updatedWalletAmount = customerWalletBalance.walletAmount - amountDeductionFromWallet;
+      await UserWalletModel().where({ userId: req.params.id }).updateOne({
+        walletAmount: updatedWalletAmount,
       });
+      if (amountDeductionFromWallet > 0) {
+        await UserTransactionModel().createOne({
+          userId: (req as any).user.id,
+          transactionType: false,
+          amount: amountDeductionFromWallet,
+          remarks: `${amountDeductionFromWallet}/- deducted from your wallet for order ${newOrder.orderNumber} - invoice`,
+        });
+      }
     }
-
     // Add product in order table
     const details = await Promise.all(
       body.cartList.map(async (cart: any) => {

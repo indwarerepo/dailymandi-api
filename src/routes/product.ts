@@ -496,11 +496,15 @@ router.get(
       whereClause['categoryId'] = req.query.categoryId;
     }
 
+    if (req.query.brandId) {
+      whereClause['brandId'] = req.query.brandId;
+    }
     const records = await ProductModel()
       .select(
-        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId, isNewProduct, isBestSeller, isFeatured, metaTitle, metaDescription, warrantyPolicy, paymentTerm, createdAt',
+        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId, isNewProduct, isBestSeller, isFeatured, metaTitle, metaDescription, warrantyPolicy, paymentTerm,brandId,createdAt',
       )
       .populate('product_category', 'id,name')
+      .populate('product_brand', 'id,name')
       .where(whereClause)
       .pagination(pageIndex, pageSize)
       .sort(sortBy, sortOrder)
@@ -510,7 +514,7 @@ router.get(
 
     const mappedRecords = await Promise.all(
       records.map(async (record: any) => {
-        const { product_category, ...rest } = record;
+        const { product_category, product_brand, ...rest } = record;
 
         // Fetch the count of variants for each product
         const countVariant = await ProductVariantModel()
@@ -579,6 +583,7 @@ router.get(
         return {
           ...rest,
           productCategory: product_category, // Map DB field to your desired name
+          productBrand: product_brand,
           variantCount: countVariant, // Add variant count to the response
           productVariant: updatedProductVariants, // Use the updated productVariant array
         };
@@ -1867,24 +1872,24 @@ router.post(
           .where({ name: data.categoryName, softDelete: false, isActive: true })
           .findOne();
 
-        //console.log('category-' + isExistCategory);
+        // console.log('category-' + `${isExistCategory.name} not exists on line no ` + i + `.`);
         if (!isExistCategory) {
           return res.status(HttpStatusCode.NotFound).send({
             statusCode: HttpStatusCode.NotFound,
-            message: `${isExistCategory.name} not exists on line no ` + i + `.`,
+            message: `${isExistCategory.name} not exists.Error in line no ` + i + `.`,
           });
         }
 
         let isExistBrand = await ProductBrandModel()
           .select('id, name')
-          .where({ name: data.brand, softDelete: false, isActive: true })
+          .where({ name: data.brandName, softDelete: false, isActive: true })
           .findOne();
 
-        //console.log('category-' + isExistCategory);
+        // console.log('category-' + isExistCategory);
         if (!isExistBrand) {
           return res.status(HttpStatusCode.NotFound).send({
             statusCode: HttpStatusCode.NotFound,
-            message: `${isExistBrand.name} not exists on line no ` + i + `.`,
+            message: `${isExistBrand.name} not exists. Error on line no ` + i + `.`,
           });
         }
 
@@ -1896,7 +1901,7 @@ router.post(
         if (!isExistTax) {
           return res.status(HttpStatusCode.NotFound).send({
             statusCode: HttpStatusCode.NotFound,
-            message: `${isExistTax.name} not exists on line no ` + i + `.`,
+            message: `${isExistTax.name} not exists. Error on line no ` + i + `.`,
           });
         }
         // console.log(isExistTax);
@@ -1914,7 +1919,8 @@ router.post(
         if (!isExistVariantMaster) {
           return res.status(HttpStatusCode.NotFound).send({
             statusCode: HttpStatusCode.NotFound,
-            message: `${isExistVariantMaster.variantName} variant not exists on line no ` + i + `.`,
+            message:
+              `${isExistVariantMaster.variantName} variant not exists. Error on line no ` + i + `.`,
           });
         }
         // let isExistProduct;
@@ -2161,7 +2167,8 @@ router.post(
             if (productVariant) {
               return res.status(HttpStatusCode.Conflict).send({
                 statusCode: HttpStatusCode.Conflict,
-                message: `${isExistVariantMaster.variantName} already exists on line no ` + i + `.`,
+                message:
+                  `${isExistVariantMaster.variantName} already exists. Error on line no ` + i + `.`,
               });
             }
           }
@@ -2249,6 +2256,7 @@ router.post(
           }
         }
         // return;
+        i++;
       }
 
       await transactionClient.query('COMMIT');
