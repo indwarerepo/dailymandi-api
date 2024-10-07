@@ -273,7 +273,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const user = await UserModel()
       .select('id, email, password, userType, name, isAdmin, isActive')
-      .where({ email: body.email, emailVerified: true })
+      .where({ email: body.email })
       .findOne();
     let userType = '';
     let driver;

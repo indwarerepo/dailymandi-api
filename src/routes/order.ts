@@ -199,6 +199,8 @@ router.post(
 
     const payableAmount = orderTotal - amountDeductionFromWallet;
 
+    const dueAmount = orderTotal - (payableAmount + amountDeductionFromWallet);
+
     // Add to order object
     obj = {
       ...obj,
@@ -214,8 +216,8 @@ router.post(
       isWalletUsed: body.isWalletUsed,
       amountDeductionFromWallet: amountDeductionFromWallet,
       payableAmount: payableAmount,
-      paidAmount: amountDeductionFromWallet,
-      dueAmount: payableAmount,
+      paidAmount: payableAmount,
+      dueAmount: dueAmount,
 
       orderStatusId: defaultStatus.id,
       deliveryAddress: isExistAddress.addressOne,
@@ -234,15 +236,22 @@ router.post(
       .createOne(obj);
     if (body.isWalletUsed) {
       let updatedWalletAmount = customerWalletBalance.walletAmount - amountDeductionFromWallet;
-      await UserWalletModel().where({ userId: req.params.id }).updateOne({
-        walletAmount: updatedWalletAmount,
-      });
+      await UserWalletModel()
+        .where({ userId: (req as any).user.id })
+        .updateOne({
+          walletAmount: updatedWalletAmount,
+        });
+      await UserModel()
+        .where({ id: (req as any).user.id })
+        .updateOne({
+          walletValue: updatedWalletAmount,
+        });
       if (amountDeductionFromWallet > 0) {
         await UserTransactionModel().createOne({
           userId: (req as any).user.id,
           transactionType: false,
           amount: amountDeductionFromWallet,
-          remarks: `${amountDeductionFromWallet}/- deducted from your wallet for order ${newOrder.orderNumber} - invoice`,
+          remarks: `Used for Order ${newOrder.orderNumber}`,
         });
       }
     }
@@ -432,7 +441,7 @@ router.get(
     if (!record) throw new CustomError('Order not exists with this id.', HttpStatusCode.NotFound);
 
     const orderDetails = await OrderDetailModel()
-      .select('id, quantity, orderPrice, originalPrice, taxAmt, varient_name')
+      .select('id, quantity, orderPrice, originalPrice, taxAmt, varient_name,order_status')
       .where({ orderId: record.id, softDelete: false })
       .populate('product', 'id, name, productImage')
       .populate('product_variant', 'id, productVariantImage')
@@ -480,7 +489,9 @@ router.put(
       deliveryOtp = Math.floor(100000 + Math.random() * 900000);
       /* Update Inventory */
       let orderDetails = await OrderDetailModel()
-        .select('id, quantity,productId, orderPrice, originalPrice, taxAmt, varient_name')
+        .select(
+          'id, quantity,productId, orderPrice, originalPrice, taxAmt, varient_name,order_status',
+        )
         .where({ orderId: isExist.id, softDelete: false })
         .find();
       const mappedRecords = await Promise.all(
@@ -622,7 +633,7 @@ router.get(
     const recordWithDetails = await Promise.all(
       records.map(async (record) => {
         const orderDetails = await OrderDetailModel()
-          .select('id, quantity, orderPrice, originalPrice, taxAmt, varient_name')
+          .select('id, quantity, orderPrice, originalPrice, taxAmt, varient_name,order_status')
           .where({ orderId: record.id, softDelete: false })
           .populate('product', 'id, name, productImage')
           .populate('product_variant', 'id, productVariantImage')
@@ -667,7 +678,7 @@ router.get(
     if (!record) throw new CustomError('Order not exists with this id.', HttpStatusCode.NotFound);
 
     const orderDetails = await OrderDetailModel()
-      .select('id, quantity, orderPrice, originalPrice, taxAmt, varient_name')
+      .select('id, quantity, orderPrice, originalPrice, taxAmt, varient_name, order_status')
       .where({ orderId: record.id, softDelete: false })
       .populate('product', 'id, name, productImage')
       .populate('product_variant', 'id, productVariantImage')

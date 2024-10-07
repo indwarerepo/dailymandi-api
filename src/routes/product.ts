@@ -2008,6 +2008,8 @@ router.post(
                   mrp: data.mrp,
                   sellingPrice: data.sellingPrice,
                   stock: data.stock,
+                  productVariantImage:
+                    '{https://aonemartstorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png,https://aonemartstorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png}',
                   createdBy: (req as any).user.id,
                 },
                 transactionClient,
@@ -2196,6 +2198,8 @@ router.post(
                   mrp: data.mrp,
                   sellingPrice: data.sellingPrice,
                   stock: data.stock,
+                  productVariantImage:
+                    '{https://aonemartstorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png,https://aonemartstorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png}',
                   createdBy: (req as any).user.id,
                 },
                 transactionClient,
