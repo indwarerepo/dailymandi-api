@@ -18,7 +18,7 @@ configureResponse(app);
 // console.log(design);
 
 const server = app.listen(PORT, () => {
-  console.log(`AoneMart Server running on port ${PORT}`);
+  console.log(`Dailymandi Server running on port ${PORT}`);
 });
 
 unhandledRejection(server);

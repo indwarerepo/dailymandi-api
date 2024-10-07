@@ -76,7 +76,7 @@ export default function (app: Express) {
   app.use(
     '/api/healthcheck',
     asyncHandler(async (req: Request, res: Response) => {
-      res.status(200).send({ statusCode: 200, message: 'Yaa! EasyBusy have good health.' });
+      res.status(200).send({ statusCode: 200, message: 'Yaa! Dailymandi have good health.' });
     }),
   );
   // app.use(auditMiddleware);
