@@ -38,7 +38,7 @@ export default function (app: Express) {
     'http://localhost:8082/',
     'http://148.113.12.204:8085',
     'http://148.113.12.204:8080',
-    'http://148.113.12.204:8086/',
+    'http://148.113.12.204:8086',
     'https://aonemart.in',
     'https://admin.aonemart.in',
   ];
