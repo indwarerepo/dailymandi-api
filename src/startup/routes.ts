@@ -36,11 +36,8 @@ export default function (app: Express) {
     'http://localhost:8003', //local web npm run start
     'http://localhost:7012',
     'http://localhost:8082/',
-    'http://148.113.12.204:8085',
-    'http://148.113.12.204:8080',
-    'http://148.113.12.204:8086/',
-    'https://aonemart.in',
-    'https://admin.aonemart.in',
+    'http://148.113.12.204:8086',
+    'https://admin.dailymandi.com',
   ];
   app.use(function (req: Request, res: Response, next: NextFunction) {
     const requestOrigin = req.headers.origin || '';
