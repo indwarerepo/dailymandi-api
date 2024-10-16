@@ -28,7 +28,7 @@ const commisionCutting = async () => {
 
       for (var i = 0; i < orderDetails.length; i++) {
         let orderdetail = await OrderDetailModel()
-          .select('totalAmt, productId')
+          .select('totalAmt,originalPrice, productId')
           .where({ orderId: orderDetails[i].id })
           .find();
         let totalCommission = 0;
@@ -40,7 +40,7 @@ const commisionCutting = async () => {
           //console.log(product);
 
           let productCommission = Math.round(
-            (orderdetail[j].totalAmt * product.commissionPercentage) / 100,
+            (orderdetail[j].originalPrice * product.commissionPercentage) / 100,
           );
           totalCommission = totalCommission + productCommission;
         }
