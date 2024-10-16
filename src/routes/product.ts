@@ -27,6 +27,7 @@ import {
   TaxMasterModel,
   VariantMasterModel,
   ProductBrandModel,
+  ProductSubCategoryModel,
 } from '../model/models';
 import { IAddProduct, IUpdateProduct, IAddProductVariant } from '../types/product';
 
@@ -82,6 +83,7 @@ router.post(
         manufacturer: body.manufacturer,
         productMethod: true,
         categoryId: body.categoryId,
+        subCategoryId: body.subCategoryId,
         brandId: body.brandId,
         productImage: body.productImage,
         isNewProduct: body.isNewProduct,
@@ -127,6 +129,7 @@ router.post(
               productId: productId, // Foreign key to the Product table
               variantId: variant.variantId,
               categoryId: body.categoryId,
+              subCategoryId: body.subCategoryId,
               skuNo: variant.skuNo,
               qrCode: variant.qrCode,
               taxId: variant.taxId,
@@ -209,7 +212,7 @@ router.post(
     const productId = body.productId;
 
     const product = await ProductModel()
-      .select('categoryId')
+      .select('categoryId,subCategoryId')
       .where({ id: body.productId, softDelete: false })
       .findOne();
 
@@ -239,6 +242,7 @@ router.post(
         productId: productId, // Foreign key to the Product table
         variantId: body.variantId,
         categoryId: product.categoryId,
+        subCategoryId: product.subCategoryId,
         skuNo: body.skuNo,
         qrCode: body.qrCode,
         taxId: body.taxId,
@@ -428,9 +432,10 @@ router.get(
     const whereClause = { softDelete: false };
     const records = await ProductModel()
       .select(
-        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId, isActive, createdAt, createdBy, isBestSeller, isNewProduct, isFeatured, metaTitle, metaDescription, warrantyPolicy, paymentTerm,brandId',
+        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId, subCategoryId, isActive, createdAt, createdBy, isBestSeller, isNewProduct, isFeatured, metaTitle, metaDescription, warrantyPolicy, paymentTerm,brandId',
       )
       .populate('product_category', 'id,name')
+      .populate('product_subcategory', 'id,name')
       .populate('product_brand', 'id,name')
       .where(whereClause)
       .pagination(pageIndex, pageSize)
@@ -470,41 +475,378 @@ router.get(
 /**
  * Get all product for web
  */
+
 router.get(
-  '/web',
+  '/web/v1/',
   asyncHandler(async (req: Request, res: Response) => {
     let pageIndex: number = parseInt((req as any).query.pageNo);
     let pageSize: number = parseInt((req as any).query.pageLimit);
     let sortBy: string = (req as any).query.sortBy;
-    let sortOrder = '1';
-    if (sortBy) {
-      if (sortBy == 'name') {
-        sortOrder = '1';
-      } else {
-        sortOrder = '-1';
-      }
-    }
-    //let sortOrder: string = (req as any).query.sortOrder;
-    let customerId = req.query.customerId;
+    let sortOrder = sortBy === 'name' ? '1' : '-1';
+    let customerId: string | undefined = req.query.customerId as string | undefined;
+
     let whereClause: { [key: string]: any } = {
       softDelete: false,
       isActive: true,
     };
 
-    // Check if `categoryId` is present in the route params
+    // Parsing categoryId and subCategoryId
     if (req.query.categoryId) {
       whereClause['categoryId'] = req.query.categoryId;
     }
 
-    if (req.query.brandId) {
-      whereClause['brandId'] = req.query.brandId;
+    // Include subCategoryId if provided
+    // let subCategoryId: string | undefined = Array.isArray(req.query.subCategoryId)
+    //   ? req.query.subCategoryId[0]
+    //   : typeof req.query.subCategoryId === 'string'
+    //     ? req.query.subCategoryId
+    //     : undefined;
+    if (req.query.subCategoryId) {
+      whereClause['subCategoryId'] = req.query.subCategoryId;
     }
+
+    let brandIds: string[] = [];
+
+    if (req.query.brandId) {
+      if (typeof req.query.brandId === 'string') {
+        brandIds = JSON.parse(req.query.brandId);
+      } else if (Array.isArray(req.query.brandId)) {
+        brandIds = req.query.brandId as string[]; // Assert that it's a string array
+      }
+    }
+
+    let whereClauses: string[] = [];
+    let params: (string | string[])[] = [];
+
+    // Check for categoryId
+    if (whereClause['categoryId']) {
+      whereClauses.push('product."categoryId" = $1');
+      params.push(whereClause['categoryId']);
+    }
+
+    // Check for brandIds
+    if (brandIds.length > 0) {
+      whereClauses.push('"brandId" = ANY($2::uuid[])');
+      params.push(brandIds);
+    }
+
+    // Check for subCategoryId if it exists
+    if (whereClause['subCategoryId']) {
+      whereClauses.push('"subCategoryId" = $3');
+      params.push(whereClause['subCategoryId']);
+    }
+
+    // Construct the final WHERE clause
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    // Adjust SQL query to use `IN` for filtering multiple brands
+    const records = await ProductModel().rawSql(
+      `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+      FROM product
+      JOIN product_category ON product_category."id" = product."categoryId"
+      JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+      JOIN product_brand ON product_brand."id" = product."brandId"
+      ${whereSql}`,
+      params,
+    );
+
+    if (!records) throw new CustomError('No records found.', HttpStatusCode.NotFound);
+
+    // Processing the records as before
+    // console.log(records['rows']);
+    const mappedRecords = await processRecords(records['rows'], customerId);
+
+    const count = records['rows'].length;
+
+    res.status(HttpStatusCode.Ok).send({
+      statusCode: HttpStatusCode.Ok,
+      message: 'Successfully found records.',
+      count,
+      data: mappedRecords,
+    });
+  }),
+);
+
+function isValidUUID(uuid: string) {
+  const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  return uuidRegex.test(uuid);
+}
+
+router.get(
+  '/web',
+  asyncHandler(async (req: Request, res: Response) => {
+    let pageIndex: number = parseInt((req as any).query.pageNo) || 1; // Default to 1 if undefined
+    let pageSize: number = parseInt((req as any).query.pageLimit) || 10; // Default to 10 if undefined
+    let sortBy: string = (req as any).query.sortBy;
+    let sortOrder = sortBy === 'name' ? '1' : '-1';
+    let customerId: string | undefined = req.query.customerId as string | undefined;
+
+    let whereClause: { [key: string]: any } = {
+      softDelete: false,
+      isActive: true,
+    };
+
+    let whereClauses: string[] = [];
+    let params = [];
+    let brandIds: string[] = [];
+    let records;
+    if (req.query.categoryId && req.query.subCategoryId && req.query.brandId) {
+      if (typeof req.query.brandId === 'string') {
+        brandIds = JSON.parse(req.query.brandId); // Assume brandId is a JSON string
+      } else if (Array.isArray(req.query.brandId)) {
+        brandIds = req.query.brandId as string[];
+      }
+      whereClauses.push('product."categoryId" = $1');
+      params.push(req.query.categoryId);
+      records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"
+         WHERE product."categoryId" = $1 AND "subCategoryId" = $2 AND "brandId" = ANY($3::uuid[])`,
+        [req.query.categoryId, req.query.subCategoryId, brandIds],
+      );
+    } else if (req.query.categoryId && req.query.brandId) {
+      console.log(2);
+      if (typeof req.query.brandId === 'string') {
+        brandIds = JSON.parse(req.query.brandId); // Assume brandId is a JSON string
+      } else if (Array.isArray(req.query.brandId)) {
+        brandIds = req.query.brandId as string[];
+      }
+      whereClauses.push('product."categoryId" = $1');
+      params.push(req.query.categoryId);
+      records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"
+         WHERE product."categoryId" = $1 AND "brandId" = ANY($2::uuid[])`,
+        [req.query.categoryId, brandIds],
+      );
+    } else if (req.query.subCategoryId && req.query.brandId) {
+      if (typeof req.query.brandId === 'string') {
+        brandIds = JSON.parse(req.query.brandId); // Assume brandId is a JSON string
+      } else if (Array.isArray(req.query.brandId)) {
+        brandIds = req.query.brandId as string[];
+      }
+      whereClauses.push('product."categoryId" = $1');
+      params.push(req.query.categoryId);
+      const records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"
+         WHERE "subCategoryId" = $1 AND "brandId" = ANY($2::uuid[])`,
+        [req.query.subCategoryId, brandIds],
+      );
+    } else if (req.query.categoryId && req.query.subCategoryId) {
+      const categoryId = req.query.categoryId as string;
+      const subCategoryId = req.query.subCategoryId as string;
+
+      // Validate UUIDs before proceeding
+      if (categoryId && subCategoryId) {
+        console.log(req.query.categoryId + '/' + req.query.subCategoryId);
+        records = await ProductModel().rawSql(
+          `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"
+         WHERE product."categoryId" = $1 AND "subCategoryId" = $2`,
+          [req.query.categoryId, req.query.subCategoryId],
+        );
+      }
+    } else if (req.query.categoryId) {
+      whereClauses.push('product."categoryId" = $1');
+      params.push(req.query.categoryId);
+      records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"
+         WHERE product."categoryId" = $1`,
+        [req.query.categoryId],
+      );
+    } else if (req.query.subCategoryId) {
+      whereClauses.push('product."categoryId" = $1');
+      params.push(req.query.categoryId);
+      records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"
+         WHERE "subCategoryId" = $1`,
+        [req.query.subCategoryId],
+      );
+    } else if (req.query.brandId) {
+      console.log(6);
+      if (typeof req.query.brandId === 'string') {
+        brandIds = JSON.parse(req.query.brandId); // Assume brandId is a JSON string
+      } else if (Array.isArray(req.query.brandId)) {
+        brandIds = req.query.brandId as string[];
+      }
+      whereClauses.push('product."categoryId" = $1');
+      params.push(req.query.categoryId);
+      records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"
+         WHERE "brandId" = ANY($1::uuid[])`,
+        [brandIds],
+      );
+    } else {
+      console.log(7);
+      if (typeof req.query.brandId === 'string') {
+        brandIds = JSON.parse(req.query.brandId); // Assume brandId is a JSON string
+      } else if (Array.isArray(req.query.brandId)) {
+        brandIds = req.query.brandId as string[];
+      }
+      whereClauses.push('product."categoryId" = $1');
+      params.push(req.query.categoryId);
+      records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"`,
+      );
+    }
+
+    if (!records) throw new CustomError('No records found.', HttpStatusCode.NotFound);
+
+    // Processing the records as before
+    const mappedRecords = await processRecords(records['rows'], customerId);
+
+    const count = records['rows'].length;
+
+    res.status(HttpStatusCode.Ok).send({
+      statusCode: HttpStatusCode.Ok,
+      message: 'Successfully found records.',
+      count,
+      data: mappedRecords,
+    });
+  }),
+);
+
+// Helper function to process records (similar to your existing logic)
+async function processRecords(records: any[], customerId: string | undefined) {
+  // Ensure records is an array
+  if (!Array.isArray(records)) {
+    throw new Error('Records should be an array');
+  }
+
+  return await Promise.all(
+    records.map(async (record: any) => {
+      try {
+        const { product_category, product_brand, ...rest } = record;
+
+        // Fetch the count of variants for each product
+        const countVariant = await ProductVariantModel()
+          .where({ productId: record.id, softDelete: false, isActive: true })
+          .countDocuments();
+
+        // Fetch product variants
+        const productVariant = await ProductVariantModel()
+          .select(
+            'id,productId,categoryId,variantId,skuNo,qrCode,purchaseCost,mrp,sellingPrice,offerPrice,taxId,stock,isReturnable,returnDaysLimit,productVariantImage',
+          )
+          .populate('variant_master', 'id,variantName')
+          .where({ productId: record.id, softDelete: false, isActive: true })
+          .find();
+
+        // Process cart and wishlist status
+        const updatedProductVariants = await processVariants(productVariant, customerId);
+
+        return {
+          ...rest,
+          productCategory: product_category,
+          productBrand: product_brand,
+          variantCount: countVariant,
+          productVariant: updatedProductVariants,
+        };
+      } catch (error) {
+        console.error(`Error processing record with id ${record.id}:`, error);
+        return null; // Handle error as needed
+      }
+    }),
+  );
+}
+
+// Helper function to process product variants (cart/wishlist logic)
+async function processVariants(variants: any[], customerId: string | undefined) {
+  return await Promise.all(
+    variants.map(async (variant: any) => {
+      let isCart = false;
+      let isWishlist = false;
+      let cartProdQnt = 0;
+
+      if (customerId) {
+        const cart = await CartMasterModel()
+          .where({
+            softDelete: false,
+            itemType: 'C',
+            productId: variant.id,
+            userId: customerId,
+          })
+          .select('id,cartProdQnt')
+          .find();
+
+        const wishlist = await CartMasterModel()
+          .where({
+            softDelete: false,
+            itemType: 'W',
+            productId: variant.id,
+            userId: customerId,
+          })
+          .select('id')
+          .find();
+
+        isCart = cart && cart.length > 0;
+        isWishlist = wishlist && wishlist.length > 0;
+        cartProdQnt = isCart ? cart[0].cartProdQnt : 0;
+      }
+
+      return {
+        ...variant,
+        variantMaster: variant.variant_master,
+        isCart,
+        isWishlist,
+        cartProdQnt,
+      };
+    }),
+  );
+}
+
+/**
+ * Get all featured  product for web
+ */
+router.get(
+  '/web/featuredProduct/',
+  asyncHandler(async (req: Request, res: Response) => {
+    let pageIndex: number = parseInt((req as any).query.pageNo);
+    let pageSize: number = parseInt((req as any).query.pageLimit);
+    let sortBy: string = (req as any).query.sortBy;
+    let sortOrder: string = (req as any).query.sortOrder;
+    let customerId = req.query.customerId;
+    let whereClause: { [key: string]: any } = {
+      softDelete: false,
+      isActive: true,
+      isFeatured: true,
+    };
+
     const records = await ProductModel()
       .select(
-        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId, isNewProduct, isBestSeller, isFeatured, metaTitle, metaDescription, warrantyPolicy, paymentTerm,brandId,createdAt',
+        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId, subCategoryId',
       )
       .populate('product_category', 'id,name')
-      .populate('product_brand', 'id,name')
+      .populate('product_subcategory', 'id,name')
       .where(whereClause)
       .pagination(pageIndex, pageSize)
       .sort(sortBy, sortOrder)
@@ -514,7 +856,7 @@ router.get(
 
     const mappedRecords = await Promise.all(
       records.map(async (record: any) => {
-        const { product_category, product_brand, ...rest } = record;
+        const { product_category, ...rest } = record;
 
         // Fetch the count of variants for each product
         const countVariant = await ProductVariantModel()
@@ -583,14 +925,13 @@ router.get(
         return {
           ...rest,
           productCategory: product_category, // Map DB field to your desired name
-          productBrand: product_brand,
           variantCount: countVariant, // Add variant count to the response
           productVariant: updatedProductVariants, // Use the updated productVariant array
         };
       }),
     );
 
-    const count = await ProductModel().where(whereClause).countDocuments();
+    const count = records.length;
 
     res.status(HttpStatusCode.Ok).send({
       statusCode: HttpStatusCode.Ok,
@@ -601,11 +942,8 @@ router.get(
   }),
 );
 
-/**
- * Get all featured  product for web
- */
 router.get(
-  '/web/featuredProduct/',
+  '/web/featuredProduct/home/',
   asyncHandler(async (req: Request, res: Response) => {
     let sortBy: string = (req as any).query.sortBy;
     let sortOrder: string = (req as any).query.sortOrder;
@@ -618,9 +956,10 @@ router.get(
 
     const records = await ProductModel()
       .select(
-        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId',
+        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId, subCategoryId',
       )
       .populate('product_category', 'id,name')
+      .populate('product_subcategory', 'id,name')
       .where(whereClause)
       .pagination(0, 6)
       .sort(sortBy, sortOrder)
@@ -722,6 +1061,8 @@ router.get(
 router.get(
   '/web/newProduct/',
   asyncHandler(async (req: Request, res: Response) => {
+    let pageIndex: number = parseInt((req as any).query.pageNo);
+    let pageSize: number = parseInt((req as any).query.pageLimit);
     let sortBy: string = (req as any).query.sortBy;
     let sortOrder: string = (req as any).query.sortOrder;
     let customerId = req.query.customerId;
@@ -733,9 +1074,123 @@ router.get(
 
     const records = await ProductModel()
       .select(
-        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId',
+        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId, subCategoryId',
       )
       .populate('product_category', 'id,name')
+      .populate('product_subcategory', 'id,name')
+      .where(whereClause)
+      .pagination(pageIndex, pageSize)
+      .sort(sortBy, sortOrder)
+      .find();
+    // console.log(records);
+    if (!records) throw new CustomError('No records found.', HttpStatusCode.NotFound);
+
+    const mappedRecords = await Promise.all(
+      records.map(async (record: any) => {
+        const { product_category, ...rest } = record;
+
+        // Fetch the count of variants for each product
+        const countVariant = await ProductVariantModel()
+          .where({ productId: record.id, softDelete: false, isActive: true })
+          .countDocuments();
+
+        const productVariant = await ProductVariantModel()
+          .select(
+            'id,productId,categoryId,variantId,skuNo,qrCode,purchaseCost,mrp,sellingPrice,offerPrice,taxId,stock,isReturnable,returnDaysLimit,productVariantImage',
+          )
+          .populate('variant_master', 'id,variantName')
+          .where({ productId: record.id, softDelete: false, isActive: true })
+          .find();
+
+        // Loop through each variant and check for cart and wishlist status
+        const updatedProductVariants = await Promise.all(
+          productVariant.map(async (variant: any) => {
+            let isCart = false;
+            let isWishlist = false;
+            let cartProdQnt = 0;
+            if (customerId) {
+              const cartWhereClause = {
+                softDelete: false,
+                itemType: 'C', // 'C' for cart items
+                productId: variant['id'],
+                userId: customerId,
+              };
+              const cart = await CartMasterModel()
+                .select('id,cartProdQnt')
+                .where(cartWhereClause)
+                .find();
+
+              const wishlistWhereClause = {
+                softDelete: false,
+                itemType: 'W', // 'W' for wishlist items
+                productId: variant['id'],
+                userId: customerId,
+              };
+              const wishlist = await CartMasterModel()
+                .select('id,cartProdQnt')
+                .where(wishlistWhereClause)
+                .find();
+
+              // Set flags if cart or wishlist items are found
+              if (cart && cart.length > 0) {
+                isCart = true;
+                cartProdQnt = cart[0].cartProdQnt;
+              }
+              if (wishlist && wishlist.length > 0) {
+                isWishlist = true;
+              }
+            }
+
+            // Return the updated variant with the isCart and isWishlist flags
+            const { variant_master, ...otherVariantFields } = variant;
+            return {
+              ...otherVariantFields,
+              variantMaster: variant_master, // Map 'variant_master' to 'variantMaster'
+              isCart: isCart,
+              isWishlist: isWishlist,
+              cartProdQnt: cartProdQnt,
+            };
+          }),
+        );
+
+        return {
+          ...rest,
+          productCategory: product_category, // Map DB field to your desired name
+          variantCount: countVariant, // Add variant count to the response
+          productVariant: updatedProductVariants, // Use the updated productVariant array
+        };
+      }),
+    );
+
+    const count = 8;
+
+    res.status(HttpStatusCode.Ok).send({
+      statusCode: HttpStatusCode.Ok,
+      message: 'Successfully found records.',
+      count,
+      data: mappedRecords,
+    });
+  }),
+);
+
+router.get(
+  '/web/newProduct/home/',
+  asyncHandler(async (req: Request, res: Response) => {
+    let sortBy: string = (req as any).query.sortBy;
+    let sortOrder: string = (req as any).query.sortOrder;
+    let customerId = req.query.customerId;
+    let whereClause: { [key: string]: any } = {
+      softDelete: false,
+      isActive: true,
+      isNewProduct: true,
+    };
+
+    const records = await ProductModel()
+      .select(
+        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId, subCategoryId',
+      )
+      .populate('product_category', 'id,name')
+      .populate('product_subcategory', 'id,name')
       .where(whereClause)
       .pagination(0, 8)
       .sort(sortBy, sortOrder)
@@ -842,9 +1297,10 @@ router.get(
     const whereClause = { softDelete: false, isActive: true, isNewProduct: true };
     const records = await ProductModel()
       .select(
-        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId, isActive, createdAt, createdBy',
+        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId, subCategoryId, isActive, createdAt, createdBy',
       )
       .populate('product_category', 'id,name')
+      .populate('product_subcategory', 'id,name')
       .where(whereClause)
       .pagination(pageIndex, pageSize)
       .sort(sortBy, sortOrder)
@@ -885,6 +1341,8 @@ router.get(
 router.get(
   '/web/related-product/',
   asyncHandler(async (req: Request, res: Response) => {
+    let pageIndex: number = parseInt((req as any).query.pageNo);
+    let pageSize: number = parseInt((req as any).query.pageLimit);
     let sortBy: string = (req as any).query.sortBy;
     let sortOrder: string = (req as any).query.sortOrder;
     let customerId = req.query.customerId;
@@ -893,7 +1351,139 @@ router.get(
     const limit = 10;
     const records = await pool.query(
       `SELECT id, name, description, "specification", "manufacturer", 
-              "productAttributes", "productImage", "categoryId" 
+              "productAttributes", "productImage", "categoryId", "subCategoryId" 
+       FROM product 
+       WHERE id != $1 
+       AND "softDelete" = false 
+       AND "categoryId" = $2
+       LIMIT $3,$4`,
+      [productId, categoryId, pageIndex, pageSize], // Array of parameter values
+    );
+    // const records = result.rows[0];
+    const recordsArray = records.rows || [];
+    //console.log(records);
+    // return;
+    // const records = await ProductModel()
+    //   .select(
+    //     'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId',
+    //   )
+    //   .populate('product_category', 'id,name')
+    //   .where(whereClause)
+    //   .pagination(0, 8)
+    //   .sort(sortBy, sortOrder)
+    //   .find();
+    // console.log(records);
+    if (!records) throw new CustomError('No records found.', HttpStatusCode.NotFound);
+
+    const mappedRecords = await Promise.all(
+      recordsArray.map(async (record: any) => {
+        const { product_category, ...rest } = record;
+
+        // Fetch the count of variants for each product
+        const countVariantResult = await pool.query(
+          `SELECT COUNT(*) 
+           FROM product_variant 
+           WHERE "productId" = $1 AND "softDelete" = false AND "isActive" = true`,
+          [record.id],
+        );
+        const countVariant = countVariantResult.rows[0].count;
+
+        // Fetch the product variants and their associated variant master details
+        const productVariantResult = await pool.query(
+          `SELECT pv.id, pv."productId", pv."categoryId", pv."variantId", pv."skuNo", pv."qrCode", 
+                  pv."purchaseCost", pv."mrp", pv."sellingPrice", pv."offerPrice", pv."taxId", 
+                  pv."stock", pv."isReturnable", pv."returnDaysLimit", pv."productVariantImage", 
+                  vm.id as "variantMasterId", vm."variantName" 
+           FROM product_variant pv 
+           LEFT JOIN variant_master vm ON pv."variantId" = vm.id 
+           WHERE pv."productId" = $1 AND pv."softDelete" = false AND pv."isActive" = true`,
+          [record.id],
+        );
+        const productVariants = productVariantResult.rows;
+
+        // Loop through each variant and check for cart and wishlist status
+        const updatedProductVariants = await Promise.all(
+          productVariants.map(async (variant: any) => {
+            let isCart = false;
+            let isWishlist = false;
+            let cartProdQnt = 0;
+
+            if (customerId) {
+              // Check if the variant is in the cart
+              const cartResult = await pool.query(
+                `SELECT id, "cartProdQnt" 
+                 FROM user_cart 
+                 WHERE "softDelete" = false AND "itemType" = 'C' 
+                 AND "productId" = $1 AND "userId" = $2`,
+                [variant.id, customerId],
+              );
+              const cart = cartResult.rows;
+
+              // Check if the variant is in the wishlist
+              const wishlistResult = await pool.query(
+                `SELECT id 
+                 FROM user_cart 
+                 WHERE "softDelete" = false AND "itemType" = 'W' 
+                 AND "productId" = $1 AND "userId" = $2`,
+                [variant.id, customerId],
+              );
+              const wishlist = wishlistResult.rows;
+
+              // Set flags if cart or wishlist items are found
+              if (cart.length > 0) {
+                isCart = true;
+                cartProdQnt = cart[0].cartProdQnt;
+              }
+              if (wishlist.length > 0) {
+                isWishlist = true;
+              }
+            }
+
+            return {
+              ...variant,
+              variantMaster: {
+                id: variant.variantMasterId,
+                variantName: variant.variantName,
+              },
+              isCart: isCart,
+              isWishlist: isWishlist,
+              cartProdQnt: cartProdQnt,
+            };
+          }),
+        );
+
+        return {
+          ...rest,
+          productCategory: product_category,
+          variantCount: countVariant, // Add variant count to the response
+          productVariant: updatedProductVariants, // Use the updated productVariant array
+        };
+      }),
+    );
+
+    const count = recordsArray.length;
+
+    res.status(HttpStatusCode.Ok).send({
+      statusCode: HttpStatusCode.Ok,
+      message: 'Successfully found records.',
+      count,
+      data: mappedRecords,
+    });
+  }),
+);
+
+router.get(
+  '/web/related-product/home/',
+  asyncHandler(async (req: Request, res: Response) => {
+    let sortBy: string = (req as any).query.sortBy;
+    let sortOrder: string = (req as any).query.sortOrder;
+    let customerId = req.query.customerId;
+    let productId = req.query.productId;
+    let categoryId = req.query.categoryId;
+    const limit = 10;
+    const records = await pool.query(
+      `SELECT id, name, description, "specification", "manufacturer", 
+              "productAttributes", "productImage", "categoryId", "subCategoryId" 
        FROM product 
        WHERE id != $1 
        AND "softDelete" = false 
@@ -1154,9 +1744,10 @@ router.get(
 
     const records = await ProductModel()
       .select(
-        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId',
+        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId,subCategoryId',
       )
       .populate('product_category', 'id,name')
+      .populate('product_subcategory', 'id,name')
       .where(whereClause)
       .pagination(pageIndex, pageSize)
       .sort(sortBy, sortOrder)
@@ -1314,9 +1905,10 @@ router.get(
     const whereClause = { softDelete: false, isActive: true, categoryId: req.params.id };
     const records = await ProductModel()
       .select(
-        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId, isActive, createdAt, createdBy',
+        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId,subCategoryId, isActive, createdAt, createdBy',
       )
       .populate('product_category', 'id,name')
+      .populate('product_subcategory', 'id,name')
       .where(whereClause)
       .pagination(pageIndex, pageSize)
       .sort(sortBy, sortOrder)
@@ -1623,9 +2215,10 @@ router.get(
 
     const record = await ProductModel()
       .select(
-        'id, name, description, specification, manufacturer, categoryId, productImage, isBestSeller, isNewProduct,isFeatured, metaTitle, metaDescription, warrantyPolicy, paymentTerm, isActive, createdAt, createdBy,brandId',
+        'id, name, description, specification, manufacturer, categoryId, subCategoryId, productImage, isBestSeller, isNewProduct,isFeatured, metaTitle, metaDescription, warrantyPolicy, paymentTerm, isActive, createdAt, createdBy,brandId',
       )
       .populate('product_category', 'id,name')
+      .populate('product_subcategory', 'id,name')
       .populate('product_brand', 'id,name')
       .where({ id: req.params.id })
       .findOne();
@@ -1702,6 +2295,7 @@ router.put(
         warrantyPolicy: body.warrantyPolicy,
         paymentTerm: body.paymentTerm,
         categoryId: body.categoryId,
+        subCategoryId: body.subCategoryId,
         brandId: body.brandId,
 
         updatedBy: (req as any).user.id,
@@ -1872,11 +2466,23 @@ router.post(
           .where({ name: data.categoryName, softDelete: false, isActive: true })
           .findOne();
 
+        let isExistSubCategory = await ProductSubCategoryModel()
+          .select('id, name')
+          .where({ name: data.subCategory, softDelete: false, isActive: true })
+          .findOne();
+
         // console.log('category-' + `${isExistCategory.name} not exists on line no ` + i + `.`);
         if (!isExistCategory) {
           return res.status(HttpStatusCode.NotFound).send({
             statusCode: HttpStatusCode.NotFound,
             message: `${isExistCategory.name} not exists.Error in line no ` + i + `.`,
+          });
+        }
+
+        if (!isExistSubCategory) {
+          return res.status(HttpStatusCode.NotFound).send({
+            statusCode: HttpStatusCode.NotFound,
+            message: `${isExistSubCategory.name} not exists.Error in line no ` + i + `.`,
           });
         }
 
@@ -1931,6 +2537,7 @@ router.post(
             .where({
               name: data.name,
               categoryId: isExistCategory.id,
+              subCategoryId: isExistSubCategory.id,
               softDelete: false,
               isActive: true,
             })
@@ -1943,6 +2550,7 @@ router.post(
               .where({
                 productId: isExistProduct.id,
                 categoryId: isExistCategory.id,
+                subCategoryId: isExistSubCategory.id,
                 variantId: isExistVariantMaster.id,
                 softDelete: false,
                 isActive: true,
@@ -1961,6 +2569,7 @@ router.post(
           let payload: any = {
             name: data.name,
             categoryId: isExistCategory.id,
+            subCategoryId: isExistSubCategory.id,
             description: data.description,
             specification: data.specification,
             manufacturer: data.manufacturer,
@@ -1998,6 +2607,7 @@ router.post(
                   productId: productId, // Foreign key to the Product table
                   variantId: isExistVariantMaster.id,
                   categoryId: isExistCategory.id,
+                  subCategoryId: isExistSubCategory.id,
                   skuNo: data.skuNo,
                   qrCode: data.qrCode,
                   taxId: isExistTax.id,
@@ -2160,6 +2770,7 @@ router.post(
               .where({
                 productId: isExistProduct.id,
                 categoryId: isExistCategory.id,
+                subCategoryId: isExistSubCategory.id,
                 variantId: isExistVariantMaster.id,
                 softDelete: false,
                 isActive: true,
@@ -2188,6 +2799,7 @@ router.post(
                   productId: productId, // Foreign key to the Product table
                   variantId: isExistVariantMaster.id,
                   categoryId: isExistCategory.id,
+                  subCategoryId: isExistSubCategory.id,
                   skuNo: data.skuNo,
                   qrCode: data.qrCode,
                   taxId: isExistTax.id,
@@ -2396,6 +3008,61 @@ router.get(
       message: 'Successfully found records.',
       count,
       data: result,
+    });
+  }),
+);
+
+/**
+ * Get all records for dropdown
+ */
+router.get(
+  '/drop-down-by-catId/:id',
+  [auth, isAdmin],
+  asyncHandler(async (req: Request, res: Response) => {
+    const records = await ProductSubCategoryModel()
+      .select('id, name')
+      .where({
+        //createdBy: (req as any).user.id,
+        categoryId: req.params.id,
+        softDelete: false,
+      })
+      .find();
+    if (!records) throw new CustomError('No records found.', HttpStatusCode.NotFound);
+    const count = await ProductSubCategoryModel()
+      .where({ softDelete: false, isActive: true })
+      .countDocuments();
+    res.status(HttpStatusCode.Ok).send({
+      statusCode: HttpStatusCode.Ok,
+      message: 'Successfully found records.',
+      data: records,
+      count: count,
+    });
+  }),
+);
+
+/**
+ * Get all records for dropdown
+ */
+router.get(
+  '/web/drop-down-by-catId/:id',
+  asyncHandler(async (req: Request, res: Response) => {
+    const records = await ProductSubCategoryModel()
+      .select('id, name')
+      .where({
+        //createdBy: (req as any).user.id,
+        categoryId: req.params.id,
+        softDelete: false,
+      })
+      .find();
+    if (!records) throw new CustomError('No records found.', HttpStatusCode.NotFound);
+    const count = await ProductSubCategoryModel()
+      .where({ softDelete: false, isActive: true })
+      .countDocuments();
+    res.status(HttpStatusCode.Ok).send({
+      statusCode: HttpStatusCode.Ok,
+      message: 'Successfully found records.',
+      data: records,
+      count: count,
     });
   }),
 );

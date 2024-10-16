@@ -233,7 +233,7 @@ router.get(
     if (!record) throw new CustomError('Order not exists with this id.', HttpStatusCode.NotFound);
 
     const orderDetails = await OrderDetailModel()
-      .select('id, quantity, orderPrice, originalPrice, taxAmt, varient_name')
+      .select('id, quantity, orderPrice, originalPrice, taxAmt, varient_name,order_status')
       .where({ orderId: record.id, softDelete: false })
       .populate('product', 'id, name, productImage')
       .populate('product_variant', 'id, productVariantImage')
@@ -813,7 +813,7 @@ router.put('/return-order/:id', [auth], async (req: ICustomRequest, res: Respons
             })
             .findOne();
 
-          const addUserWallet = await UserWalletModel()
+          /*  const addUserWallet = await UserWalletModel()
             .where({ id: userWallet.id })
             .updateOne({
               userId: order.customerId,
@@ -834,7 +834,7 @@ router.put('/return-order/:id', [auth], async (req: ICustomRequest, res: Respons
             amount: orderDetails.orderPrice,
             remarks: 'Refund Against Order # ' + order.orderNumber,
             // createdBy: (req as any).user.id,
-          });
+          });*/
 
           const updateHistory = await ProductInventoryHistoryModel().createOne({
             productId: productVariant.productId,

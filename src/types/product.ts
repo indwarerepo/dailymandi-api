@@ -78,6 +78,7 @@ export interface Product {
   manufacturer: number;
   productAttributes?: string;
   categoryId: string;
+  subCategoryId: string;
   brandId: string;
   productVariant: productV[];
   productImage: string;
@@ -104,6 +105,7 @@ export type IAddProduct = Pick<
   | 'specification'
   | 'manufacturer'
   | 'categoryId'
+  | 'subCategoryId'
   | 'brandId'
   | 'productImage'
   | 'isFeatured'
@@ -164,6 +166,7 @@ export type IUpdateProduct = Pick<
   | 'specification'
   | 'manufacturer'
   | 'categoryId'
+  | 'subCategoryId'
   | 'brandId'
   | 'productImage'
   | 'isFeatured'

@@ -199,8 +199,6 @@ router.post(
 
     const payableAmount = orderTotal - amountDeductionFromWallet;
 
-    const dueAmount = orderTotal - (payableAmount + amountDeductionFromWallet);
-
     // Add to order object
     obj = {
       ...obj,
@@ -216,8 +214,8 @@ router.post(
       isWalletUsed: body.isWalletUsed,
       amountDeductionFromWallet: amountDeductionFromWallet,
       payableAmount: payableAmount,
-      paidAmount: payableAmount,
-      dueAmount: dueAmount,
+      paidAmount: amountDeductionFromWallet,
+      dueAmount: payableAmount,
 
       orderStatusId: defaultStatus.id,
       deliveryAddress: isExistAddress.addressOne,

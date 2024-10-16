@@ -34,29 +34,61 @@ const upload = multer({ storage: storage });
 /////////////////////////// web apis ////////////////////////
 
 /**
- * Get all banner
+ * Get all web banner
  */
 router.get(
   '/web',
   asyncHandler(async (req: Request, res: Response) => {
     const whereClause = { bannerDisplay: 'W', isActive: true, softDelete: false };
+
     const records = await BannerModel()
       .select('id, name, categoryId, image, bannerType, bannerDisplay')
       .populate('product_category', 'id,name')
       .where(whereClause)
       .find();
+
     if (!records) throw new CustomError('No records found.', HttpStatusCode.NotFound);
 
-    // const mappedRecords = records.map((record: any) => {
-    //   const { product_category, ...rest } = record;
-    //   return {
-    //     ...rest,
-    //     productCategory: product_category, // Map DB field to your desired name
-    //   };
-    // });
+    const bannerImages = records.reduce((acc: any, record: any, index: number) => {
+      acc[`bannerImage${record.bannerType}`] = {
+        link: record.image,
+        categoryId: record.categoryId || '', // Include categoryId, default to an empty string if not present
+      };
+      return acc;
+    }, {});
+
+    const count = await BannerModel().where(whereClause).countDocuments();
+
+    res.status(HttpStatusCode.Ok).send({
+      statusCode: HttpStatusCode.Ok,
+      message: 'Successfully found records.',
+      count,
+      data: bannerImages,
+    });
+  }),
+);
+
+/**
+ * Get all mobile banner
+ */
+router.get(
+  '/mobile/',
+  asyncHandler(async (req: Request, res: Response) => {
+    const whereClause = { bannerDisplay: 'M', isActive: true, softDelete: false };
+
+    const records = await BannerModel()
+      .select('id, name, categoryId, image, bannerType, bannerDisplay')
+      .populate('product_category', 'id,name')
+      .where(whereClause)
+      .find();
+
+    if (!records) throw new CustomError('No records found.', HttpStatusCode.NotFound);
 
     const bannerImages = records.reduce((acc: any, record: any, index: number) => {
-      acc[`bannerImage${record.bannerType}`] = record.image; // Create keys like bannerImage0, bannerImage1, etc.
+      acc[`bannerImage${record.bannerType}`] = {
+        link: record.image,
+        categoryId: record.categoryId || '', // Include categoryId, default to an empty string if not present
+      };
       return acc;
     }, {});
 
