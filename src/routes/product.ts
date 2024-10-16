@@ -567,13 +567,8 @@ router.get(
   }),
 );
 
-function isValidUUID(uuid: string) {
-  const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-  return uuidRegex.test(uuid);
-}
-
 router.get(
-  '/web',
+  '/web/v2/',
   asyncHandler(async (req: Request, res: Response) => {
     let pageIndex: number = parseInt((req as any).query.pageNo) || 1; // Default to 1 if undefined
     let pageSize: number = parseInt((req as any).query.pageLimit) || 10; // Default to 10 if undefined
@@ -596,8 +591,6 @@ router.get(
       } else if (Array.isArray(req.query.brandId)) {
         brandIds = req.query.brandId as string[];
       }
-      whereClauses.push('product."categoryId" = $1');
-      params.push(req.query.categoryId);
       records = await ProductModel().rawSql(
         `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
         FROM product
@@ -608,7 +601,6 @@ router.get(
         [req.query.categoryId, req.query.subCategoryId, brandIds],
       );
     } else if (req.query.categoryId && req.query.brandId) {
-      console.log(2);
       if (typeof req.query.brandId === 'string') {
         brandIds = JSON.parse(req.query.brandId); // Assume brandId is a JSON string
       } else if (Array.isArray(req.query.brandId)) {
@@ -735,6 +727,163 @@ router.get(
   }),
 );
 
+router.get(
+  '/web',
+  asyncHandler(async (req: Request, res: Response) => {
+    let pageIndex: number = parseInt((req as any).query.pageNo) || 1; // Default to 1 if undefined
+    let pageSize: number = parseInt((req as any).query.pageLimit) || 10; // Default to 10 if undefined
+    let sortBy: string = (req as any).query.sortBy;
+    let sortOrder = sortBy === 'name' ? '1' : '-1';
+    let customerId: string | undefined = req.query.customerId as string | undefined;
+
+    let whereClause: { [key: string]: any } = {
+      softDelete: false,
+      isActive: true,
+    };
+
+    let whereClauses: string[] = [];
+    let params = [];
+    let brandIds: string[] = [];
+    let records;
+    if (
+      req.query.categoryId &&
+      req.query.subCategoryId &&
+      req.query.brandId &&
+      req.query.categoryId != '' &&
+      req.query.subCategoryId != ''
+    ) {
+      console.log(1);
+      if (typeof req.query.brandId === 'string') {
+        brandIds = JSON.parse(req.query.brandId); // Assume brandId is a JSON string
+      } else if (Array.isArray(req.query.brandId)) {
+        brandIds = req.query.brandId as string[];
+      }
+      records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"
+         WHERE product."categoryId" = $1 AND "subCategoryId" = $2 AND "brandId" = ANY($3::uuid[])`,
+        [req.query.categoryId, req.query.subCategoryId, brandIds],
+      );
+    } else if (req.query.categoryId && req.query.brandId && req.query.categoryId != '') {
+      console.log(2);
+      if (typeof req.query.brandId === 'string') {
+        brandIds = JSON.parse(req.query.brandId); // Assume brandId is a JSON string
+      } else if (Array.isArray(req.query.brandId)) {
+        brandIds = req.query.brandId as string[];
+      }
+      records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"
+         WHERE product."categoryId" = $1 AND "brandId" = ANY($2::uuid[])`,
+        [req.query.categoryId, brandIds],
+      );
+    } else if (req.query.subCategoryId && req.query.brandId && req.query.subCategoryId != '') {
+      //console.log(3);
+      if (typeof req.query.brandId === 'string') {
+        brandIds = JSON.parse(req.query.brandId); // Assume brandId is a JSON string
+      } else if (Array.isArray(req.query.brandId)) {
+        brandIds = req.query.brandId as string[];
+      }
+      // console.log(brandIds);
+      records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"
+         WHERE "subCategoryId" = $1 AND "brandId" = ANY($2::uuid[])`,
+        [req.query.subCategoryId, brandIds],
+      );
+    } else if (
+      req.query.categoryId &&
+      req.query.subCategoryId &&
+      req.query.categoryId != '' &&
+      req.query.subCategoryId != ''
+    ) {
+      console.log(4);
+      records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"
+         WHERE product."categoryId" = $1 AND "subCategoryId" = $2`,
+        [req.query.categoryId, req.query.subCategoryId],
+      );
+    } else if (req.query.categoryId && req.query.categoryId != '') {
+      console.log(5);
+      records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"
+         WHERE product."categoryId" = $1`,
+        [req.query.categoryId],
+      );
+    } else if (req.query.subCategoryId && req.query.subCategoryId != '') {
+      console.log(6);
+      whereClauses.push('product."categoryId" = $1');
+      params.push(req.query.categoryId);
+      records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"
+         WHERE "subCategoryId" = $1`,
+        [req.query.subCategoryId],
+      );
+    } else if (req.query.brandId) {
+      console.log(7);
+      if (typeof req.query.brandId === 'string') {
+        brandIds = JSON.parse(req.query.brandId); // Assume brandId is a JSON string
+      } else if (Array.isArray(req.query.brandId)) {
+        brandIds = req.query.brandId as string[];
+      }
+      whereClauses.push('product."categoryId" = $1');
+      params.push(req.query.categoryId);
+      records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"
+         WHERE "brandId" = ANY($1::uuid[])`,
+        [brandIds],
+      );
+    } else {
+      records = await ProductModel().rawSql(
+        `SELECT product."id", product."name", product."description", "specification", "manufacturer", "productAttributes", "productImage", product."categoryId", "subCategoryId", "isNewProduct", "isBestSeller", product."isFeatured", product."metaTitle", product."metaDescription", "warrantyPolicy", "paymentTerm", "brandId"
+        FROM product
+        JOIN product_category ON product_category."id" = product."categoryId"
+        JOIN product_subcategory ON product_subcategory."id" = product."subCategoryId"
+        JOIN product_brand ON product_brand."id" = product."brandId"`,
+      );
+    }
+
+    if (!records) throw new CustomError('No records found.', HttpStatusCode.NotFound);
+
+    // Processing the records as before
+    const mappedRecords = await processRecords(records['rows'], customerId);
+
+    const count = records['rows'].length;
+
+    res.status(HttpStatusCode.Ok).send({
+      statusCode: HttpStatusCode.Ok,
+      message: 'Successfully found records.',
+      count,
+      data: mappedRecords,
+    });
+  }),
+);
+
 // Helper function to process records (similar to your existing logic)
 async function processRecords(records: any[], customerId: string | undefined) {
   // Ensure records is an array
@@ -828,7 +977,7 @@ async function processVariants(variants: any[], customerId: string | undefined) 
  * Get all featured  product for web
  */
 router.get(
-  '/web/featuredProduct/',
+  '/web/featuredproduct/',
   asyncHandler(async (req: Request, res: Response) => {
     let pageIndex: number = parseInt((req as any).query.pageNo);
     let pageSize: number = parseInt((req as any).query.pageLimit);
@@ -943,7 +1092,7 @@ router.get(
 );
 
 router.get(
-  '/web/featuredProduct/home/',
+  '/web/featuredproduct/home/',
   asyncHandler(async (req: Request, res: Response) => {
     let sortBy: string = (req as any).query.sortBy;
     let sortOrder: string = (req as any).query.sortOrder;
@@ -1059,7 +1208,7 @@ router.get(
  * Get all new  product for web
  */
 router.get(
-  '/web/newProduct/',
+  '/web/newproduct/',
   asyncHandler(async (req: Request, res: Response) => {
     let pageIndex: number = parseInt((req as any).query.pageNo);
     let pageSize: number = parseInt((req as any).query.pageLimit);
@@ -1162,7 +1311,7 @@ router.get(
       }),
     );
 
-    const count = 8;
+    const count = records.length;
 
     res.status(HttpStatusCode.Ok).send({
       statusCode: HttpStatusCode.Ok,
@@ -1174,7 +1323,7 @@ router.get(
 );
 
 router.get(
-  '/web/newProduct/home/',
+  '/web/newproduct/home/',
   asyncHandler(async (req: Request, res: Response) => {
     let sortBy: string = (req as any).query.sortBy;
     let sortOrder: string = (req as any).query.sortOrder;
@@ -1341,8 +1490,8 @@ router.get(
 router.get(
   '/web/related-product/',
   asyncHandler(async (req: Request, res: Response) => {
-    let pageIndex: number = parseInt((req as any).query.pageNo);
-    let pageSize: number = parseInt((req as any).query.pageLimit);
+    let pageIndex: number = parseInt((req as any).query.pageNo) || 0;
+    let pageSize: number = parseInt((req as any).query.pageLimit) || 10;
     let sortBy: string = (req as any).query.sortBy;
     let sortOrder: string = (req as any).query.sortOrder;
     let customerId = req.query.customerId;
@@ -1356,8 +1505,9 @@ router.get(
        WHERE id != $1 
        AND "softDelete" = false 
        AND "categoryId" = $2
-       LIMIT $3,$4`,
-      [productId, categoryId, pageIndex, pageSize], // Array of parameter values
+       LIMIT $3
+       OFFSET $4`,
+      [productId, categoryId, pageSize, pageIndex * pageSize], // Array of parameter values
     );
     // const records = result.rows[0];
     const recordsArray = records.rows || [];
@@ -1729,7 +1879,7 @@ router.get(
  * Get all best seller  product for web
  */
 router.get(
-  '/web/bestSeller/',
+  '/web/bestseller/',
   asyncHandler(async (req: Request, res: Response) => {
     let pageIndex: number = parseInt((req as any).query.pageNo);
     let pageSize: number = parseInt((req as any).query.pageLimit);
@@ -1843,6 +1993,120 @@ router.get(
   }),
 );
 
+router.get(
+  '/web/bestseller/home/',
+  asyncHandler(async (req: Request, res: Response) => {
+    let pageIndex: number = parseInt((req as any).query.pageNo);
+    let pageSize: number = parseInt((req as any).query.pageLimit);
+    let sortBy: string = (req as any).query.sortBy;
+    let sortOrder: string = (req as any).query.sortOrder;
+    let customerId = req.query.customerId;
+    let whereClause: { [key: string]: any } = {
+      softDelete: false,
+      isActive: true,
+      isBestSeller: true,
+    };
+
+    const records = await ProductModel()
+      .select(
+        'id, name, description, specification, manufacturer, productAttributes, productImage, categoryId,subCategoryId',
+      )
+      .populate('product_category', 'id,name')
+      .populate('product_subcategory', 'id,name')
+      .where(whereClause)
+      .pagination(0, 8)
+      .sort(sortBy, sortOrder)
+      .find();
+
+    if (!records) throw new CustomError('No records found.', HttpStatusCode.NotFound);
+
+    const mappedRecords = await Promise.all(
+      records.map(async (record: any) => {
+        const { product_category, ...rest } = record;
+
+        // Fetch the count of variants for each product
+        const countVariant = await ProductVariantModel()
+          .where({ productId: record.id, softDelete: false, isActive: true })
+          .countDocuments();
+
+        const productVariant = await ProductVariantModel()
+          .select(
+            'id,productId,categoryId,variantId,skuNo,qrCode,purchaseCost,mrp,sellingPrice,offerPrice,taxId,stock,isReturnable,returnDaysLimit,productVariantImage',
+          )
+          .populate('variant_master', 'id,variantName')
+          .where({ productId: record.id, softDelete: false, isActive: true })
+          .find();
+
+        // Loop through each variant and check for cart and wishlist status
+        const updatedProductVariants = await Promise.all(
+          productVariant.map(async (variant: any) => {
+            let isCart = false;
+            let isWishlist = false;
+            let cartProdQnt = 0;
+            if (customerId) {
+              const cartWhereClause = {
+                softDelete: false,
+                itemType: 'C', // 'C' for cart items
+                productId: variant['id'],
+                userId: customerId,
+              };
+              const cart = await CartMasterModel()
+                .select('id,cartProdQnt')
+                .where(cartWhereClause)
+                .find();
+
+              const wishlistWhereClause = {
+                softDelete: false,
+                itemType: 'W', // 'W' for wishlist items
+                productId: variant['id'],
+                userId: customerId,
+              };
+              const wishlist = await CartMasterModel()
+                .select('id,cartProdQnt')
+                .where(wishlistWhereClause)
+                .find();
+
+              // Set flags if cart or wishlist items are found
+              if (cart && cart.length > 0) {
+                isCart = true;
+                cartProdQnt = cart[0].cartProdQnt;
+              }
+              if (wishlist && wishlist.length > 0) {
+                isWishlist = true;
+              }
+            }
+
+            // Return the updated variant with the isCart and isWishlist flags
+            const { variant_master, ...otherVariantFields } = variant;
+            return {
+              ...otherVariantFields,
+              variantMaster: variant_master, // Map 'variant_master' to 'variantMaster'
+              isCart: isCart,
+              isWishlist: isWishlist,
+              cartProdQnt: cartProdQnt,
+            };
+          }),
+        );
+
+        return {
+          ...rest,
+          productCategory: product_category, // Map DB field to your desired name
+          variantCount: countVariant, // Add variant count to the response
+          productVariant: updatedProductVariants, // Use the updated productVariant array
+        };
+      }),
+    );
+
+    const count = records.length;
+
+    res.status(HttpStatusCode.Ok).send({
+      statusCode: HttpStatusCode.Ok,
+      message: 'Successfully found records.',
+      count,
+      data: mappedRecords,
+    });
+  }),
+);
 router.get(
   '/web/bestSeller/v1/',
   asyncHandler(async (req: Request, res: Response) => {
@@ -2581,7 +2845,7 @@ router.post(
             paymentTerm: data.paymentTerm,
             brandId: isExistBrand.id,
             productImage:
-              'https://aonemartstorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png',
+              'https://dailymandistorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png',
             createdBy: (req as any).user.id,
           };
 
@@ -2619,7 +2883,7 @@ router.post(
                   sellingPrice: data.sellingPrice,
                   stock: data.stock,
                   productVariantImage:
-                    '{https://aonemartstorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png,https://aonemartstorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png}',
+                    '{https://dailymandistorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png,https://dailymandistorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png}',
                   createdBy: (req as any).user.id,
                 },
                 transactionClient,
@@ -2811,7 +3075,7 @@ router.post(
                   sellingPrice: data.sellingPrice,
                   stock: data.stock,
                   productVariantImage:
-                    '{https://aonemartstorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png,https://aonemartstorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png}',
+                    '{https://dailymandistorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png,https://dailymandistorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png}',
                   createdBy: (req as any).user.id,
                 },
                 transactionClient,
