@@ -9,6 +9,7 @@ import auditMiddleware from '../middlewares/audit';
 
 import userRoutes from '../routes/user';
 import productCategoryRoutes from '../routes/product-category';
+import productSubCategoryRoutes from '../routes/product-subcategory';
 import productBrandRoutes from '../routes/product-brand';
 import zoneRoutes from '../routes/zone';
 import pincodeRoutes from '../routes/pincode';
@@ -38,7 +39,6 @@ export default function (app: Express) {
     'http://localhost:8082/',
     'http://148.113.12.204:8085',
     'http://148.113.12.204:8080',
-    'http://148.113.12.204:8086',
     'https://aonemart.in',
     'https://admin.aonemart.in',
   ];
@@ -76,13 +76,14 @@ export default function (app: Express) {
   app.use(
     '/api/healthcheck',
     asyncHandler(async (req: Request, res: Response) => {
-      res.status(200).send({ statusCode: 200, message: 'Yaa! Dailymandi have good health.' });
+      res.status(200).send({ statusCode: 200, message: 'Yaa! EasyBusy have good health.' });
     }),
   );
   // app.use(auditMiddleware);
 
   app.use('/api/user/', userRoutes);
   app.use('/api/product-category/', productCategoryRoutes);
+  app.use('/api/product-subcategory/', productSubCategoryRoutes);
   app.use('/api/product-brand/', productBrandRoutes);
   app.use('/api/zone/', zoneRoutes);
   app.use('/api/pincode/', pincodeRoutes);
