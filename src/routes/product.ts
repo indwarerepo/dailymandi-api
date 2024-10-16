@@ -2845,7 +2845,7 @@ router.post(
             paymentTerm: data.paymentTerm,
             brandId: isExistBrand.id,
             productImage:
-              'https://dailymandistorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png',
+              'https://dailymandistorageccount.blob.core.windows.net/productcontainer/defaultProduct.png',
             createdBy: (req as any).user.id,
           };
 
@@ -2883,7 +2883,7 @@ router.post(
                   sellingPrice: data.sellingPrice,
                   stock: data.stock,
                   productVariantImage:
-                    '{https://dailymandistorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png,https://dailymandistorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png}',
+                    '{https://dailymandistorageccount.blob.core.windows.net/productcontainer/defaultProduct.png,https://dailymandistorageccount.blob.core.windows.net/productcontainer/defaultProduct.png}',
                   createdBy: (req as any).user.id,
                 },
                 transactionClient,
@@ -3075,7 +3075,7 @@ router.post(
                   sellingPrice: data.sellingPrice,
                   stock: data.stock,
                   productVariantImage:
-                    '{https://dailymandistorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png,https://dailymandistorageaccount.blob.core.windows.net/productcontainer/defaultProduct.png}',
+                    '{https://dailymandistorageccount.blob.core.windows.net/productcontainer/defaultProduct.png,https://dailymandistorageccount.blob.core.windows.net/productcontainer/defaultProduct.png}',
                   createdBy: (req as any).user.id,
                 },
                 transactionClient,
