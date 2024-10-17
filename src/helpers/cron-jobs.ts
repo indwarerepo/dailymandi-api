@@ -14,10 +14,10 @@ const commisionCutting = async () => {
     let order = await OrderModel().rawSql(
       `SELECT *
             FROM orders
-            WHERE "commissionDistributed" = false AND "isReturn" = false AND "isDelivered" = true
-            AND "createdAt" >= NOW() - INTERVAL '7 days'`,
+            WHERE "commissionDistributed" = false AND "isReturn" = false AND "isDelivered" = true AND "createdAt" >= NOW() - INTERVAL '7 days'`,
       [],
     );
+    // AND "createdAt" >= NOW() - INTERVAL '7 days'
     //console.log(order.rows);
 
     if (order.rows.length < 1) {
@@ -28,7 +28,7 @@ const commisionCutting = async () => {
 
       for (var i = 0; i < orderDetails.length; i++) {
         let orderdetail = await OrderDetailModel()
-          .select('totalAmt,originalPrice, productId')
+          .select('totalAmt,originalPrice, quantity,productId')
           .where({ orderId: orderDetails[i].id })
           .find();
         let totalCommission = 0;
@@ -38,9 +38,9 @@ const commisionCutting = async () => {
             .where({ id: orderdetail[j].productId })
             .findOne();
           //console.log(product);
-
+          let finalCommissionprice = orderdetail[j].originalPrice * orderdetail[j].quantity;
           let productCommission = Math.round(
-            (orderdetail[j].originalPrice * product.commissionPercentage) / 100,
+            (finalCommissionprice * product.commissionPercentage) / 100,
           );
           totalCommission = totalCommission + productCommission;
         }
@@ -49,7 +49,7 @@ const commisionCutting = async () => {
           .select('referredBy')
           .where({ id: orderDetails[i].customerId })
           .findOne();
-        //console.log(customer);
+        // console.log(customer);
 
         if (customer.referredBy) {
           let referrer = await UserModel()
@@ -61,8 +61,8 @@ const commisionCutting = async () => {
             .where({ userId: referrer.id })
             .findOne();
 
-          // console.log(referrer);
-          // console.log(customerAccount);
+          //console.log(referrer);
+          //console.log(customerAccount);
 
           let finalWalletAmount = customerAccount.walletAmount + totalCommission;
           let finalRefWalletAmount = referrer.walletValue + totalCommission;
