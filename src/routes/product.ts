@@ -174,7 +174,7 @@ router.post(
               previousStock: variant.stock,
               currentStock: variant.stock,
               changeStock: 0,
-              remarks: variant.remarks,
+              remarks: 'Add product variant',
               createdBy: (req as any).user.id,
             });
           }
@@ -288,7 +288,7 @@ router.post(
         previousStock: body.stock,
         currentStock: body.stock,
         changeStock: 0,
-        remarks: body.remarks,
+        remarks: 'Add product variant',
         createdBy: (req as any).user.id,
       });
     }
@@ -405,7 +405,7 @@ router.put(
       previousStock: productVariant.stock,
       currentStock: body.stock,
       changeStock: body.stock - productVariant.stock,
-      remarks: body.remarks,
+      remarks: 'Update Product Variant',
       createdBy: (req as any).user.id,
     });
 

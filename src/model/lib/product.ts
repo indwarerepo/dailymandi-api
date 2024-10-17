@@ -46,7 +46,7 @@ class Product extends Model {
             batchNo: joi.string().required(),
             manufacturingDate: joi.date().required(),
             expiryDate: joi.date().required(),
-            remarks: joi.string().required(),
+            // remarks: joi.string().required(),
           }),
         )
         .required(),
@@ -101,7 +101,7 @@ class Product extends Model {
       batchNo: joi.string().required(),
       manufacturingDate: joi.date().required(),
       expiryDate: joi.date().required(),
-      remarks: joi.string().required(),
+      // remarks: joi.string().required(),
     });
     return schema.validate(body);
   };
@@ -127,7 +127,7 @@ class Product extends Model {
       batchNo: joi.string().required(),
       manufacturingDate: joi.date().required(),
       expiryDate: joi.date().required(),
-      remarks: joi.string().required(),
+      //remarks: joi.string().required(),
     });
     return schema.validate(body);
   };

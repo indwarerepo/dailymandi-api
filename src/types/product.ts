@@ -43,7 +43,7 @@ export type productInventoryHistory = {
   previousStock: number;
   currentStock: number;
   changeStock: number;
-  remarks: string;
+  //remarks: string;
   isActive: boolean;
   softDelete: boolean;
   createdAt: Date;
@@ -68,7 +68,7 @@ export type productV = {
   batchNo: string;
   manufacturingDate: Date;
   expiryDate: Date;
-  remarks: string;
+  //remarks: string;
 };
 export interface Product {
   id: string;
@@ -137,7 +137,7 @@ export type productVariant = {
   batchNo: string;
   manufacturingDate: Date;
   expiryDate: Date;
-  remarks: string;
+  // remarks: string;
 };
 export type IAddProductVariant = Pick<
   productVariant,
@@ -157,7 +157,6 @@ export type IAddProductVariant = Pick<
   | 'batchNo'
   | 'manufacturingDate'
   | 'expiryDate'
-  | 'remarks'
 >;
 export type IUpdateProduct = Pick<
   Product,
